@@ -2,5 +2,6 @@
 members = [
     "crates/core",
     "crates/crossover",
+    "crates/circuit",
 ]
 resolver = "2"

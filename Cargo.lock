@@ -3,10 +3,21 @@
 version = 4
 
 [[package]]
+name = "audio-spice-circuit"
+version = "0.1.0"
+dependencies = [
+ "audio-spice-core",
+ "audio-spice-crossover",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "audio-spice-core"
 version = "0.1.0"
 dependencies = [
  "num-complex",
+ "serde",
 ]
 
 [[package]]

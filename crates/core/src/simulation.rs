@@ -29,3 +29,38 @@ pub struct AcResult {
     pub node_voltages: HashMap<usize, Vec<Cx>>,
     pub vsource_currents: HashMap<String, Vec<Cx>>,
 }
+
+#[derive(Debug, Clone)]
+pub struct DcResult {
+    pub node_voltages: HashMap<usize, f64>,
+    pub vsource_currents: HashMap<String, f64>,
+    pub converged: bool,
+    pub iterations: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct TranSweep {
+    pub t_start: f64,
+    pub t_stop: f64,
+    pub t_step: f64,
+    pub t_max: f64,
+}
+
+impl TranSweep {
+    pub fn time_points(&self) -> Vec<f64> {
+        let mut points = Vec::new();
+        let mut t = self.t_start;
+        while t <= self.t_stop {
+            points.push(t);
+            t += self.t_step;
+        }
+        points
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TranResult {
+    pub time_points: Vec<f64>,
+    pub node_voltages: HashMap<usize, Vec<f64>>,
+    pub vsource_currents: HashMap<String, Vec<f64>>,
+}

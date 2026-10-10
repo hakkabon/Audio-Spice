@@ -1,0 +1,10 @@
+[package]
+name = "audio-spice-circuit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+audio-spice-core = { path = "../core" }
+audio-spice-crossover = { path = "../crossover" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
