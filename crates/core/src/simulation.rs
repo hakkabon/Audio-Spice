@@ -49,10 +49,12 @@ pub struct TranSweep {
 impl TranSweep {
     pub fn time_points(&self) -> Vec<f64> {
         let mut points = Vec::new();
-        let mut t = self.t_start;
-        while t <= self.t_stop {
-            points.push(t);
-            t += self.t_step;
+        let num_steps = ((self.t_stop - self.t_start) / self.t_step).ceil() as usize;
+        for i in 0..=num_steps {
+            let t = self.t_start + i as f64 * self.t_step;
+            if t <= self.t_stop + 1e-12 {
+                points.push(t);
+            }
         }
         points
     }

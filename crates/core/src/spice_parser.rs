@@ -265,7 +265,7 @@ fn parse_value(s: &str) -> Result<f64, String> {
     let mut num_str = s.to_string();
     let upper_str = num_str.to_uppercase();
     
-    // Handle compound suffixes first (e.g., uF, pF, nH, uH, mH)
+    // Handle compound suffixes first (e.g., uF, pF, nH, uH, mH, mA, uA, nA, pA, mV, uV, nV, pV)
     if upper_str.ends_with("UF") || upper_str.ends_with("µF") {
         mult = 1e-6;
         num_str = num_str[..num_str.len()-2].to_string();
@@ -275,6 +275,9 @@ fn parse_value(s: &str) -> Result<f64, String> {
     } else if upper_str.ends_with("NF") {
         mult = 1e-9;
         num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("MF") {
+        mult = 1e-3;
+        num_str = num_str[..num_str.len()-2].to_string();
     } else if upper_str.ends_with("MH") {
         mult = 1e-3;
         num_str = num_str[..num_str.len()-2].to_string();
@@ -283,6 +286,36 @@ fn parse_value(s: &str) -> Result<f64, String> {
         num_str = num_str[..num_str.len()-2].to_string();
     } else if upper_str.ends_with("NH") {
         mult = 1e-9;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("MA") || upper_str.ends_with("mA") {
+        mult = 1e-3;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("UA") || upper_str.ends_with("µA") {
+        mult = 1e-6;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("NA") {
+        mult = 1e-9;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("PA") {
+        mult = 1e-12;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("KA") {
+        mult = 1e3;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("MV") || upper_str.ends_with("mV") {
+        mult = 1e-3;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("UV") || upper_str.ends_with("µV") {
+        mult = 1e-6;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("NV") {
+        mult = 1e-9;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("PV") {
+        mult = 1e-12;
+        num_str = num_str[..num_str.len()-2].to_string();
+    } else if upper_str.ends_with("KV") {
+        mult = 1e3;
         num_str = num_str[..num_str.len()-2].to_string();
     } else if upper_str.ends_with("K") || upper_str.ends_with("KOHM") || upper_str.ends_with("KΩ") {
         mult = 1e3;

@@ -588,7 +588,9 @@ impl CrossoverSynthesizer {
         let decade = value.log10().floor() as i32;
         let normalized = value / 10.0_f64.powi(decade);
         let closest = e12.iter().min_by(|a, b| {
-            (*a - normalized).abs().partial_cmp(&(*b - normalized).abs()).unwrap()
+            let diff_a = (*a - normalized).abs();
+            let diff_b = (*b - normalized).abs();
+            diff_a.partial_cmp(&diff_b).unwrap().then_with(|| a.partial_cmp(b).unwrap())
         }).unwrap();
         *closest * 10.0_f64.powi(decade)
     }
@@ -601,7 +603,9 @@ impl CrossoverSynthesizer {
         let decade = value.log10().floor() as i32;
         let normalized = value / 10.0_f64.powi(decade);
         let closest = e24.iter().min_by(|a, b| {
-            (*a - normalized).abs().partial_cmp(&(*b - normalized).abs()).unwrap()
+            let diff_a = (*a - normalized).abs();
+            let diff_b = (*b - normalized).abs();
+            diff_a.partial_cmp(&diff_b).unwrap().then_with(|| a.partial_cmp(b).unwrap())
         }).unwrap();
         *closest * 10.0_f64.powi(decade)
     }

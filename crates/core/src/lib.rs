@@ -9,6 +9,19 @@ pub mod solver;
 pub mod spice_parser;
 pub mod types;
 
+#[cfg(test)]
+mod component_tests;
+#[cfg(test)]
+mod mna_tests;
+#[cfg(test)]
+mod solver_tests;
+#[cfg(test)]
+mod simulation_tests;
+#[cfg(test)]
+mod spice_parser_tests;
+#[cfg(test)]
+mod model_tests;
+
 pub use component::Component;
 pub use engine::{simulate_ac, simulate_dc, simulate_tran};
 pub use error::{SimError, SimResult};

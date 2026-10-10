@@ -15,10 +15,12 @@ impl MnaSystem {
         let num_nodes = netlist.max_node;
         let mut vsources = Vec::new();
         for comp in &netlist.components {
-            if matches!(comp, Component::VoltageSource { .. } | Component::CCVS { .. }) {
+            if matches!(comp, Component::VoltageSource { .. } | Component::CCVS { .. } | Component::VCVS { .. }) {
                 if let Component::VoltageSource { name, n_pos, n_neg, .. } = comp {
                     vsources.push((name.clone(), *n_pos, *n_neg));
                 } else if let Component::CCVS { name, n_out_pos, n_out_neg, .. } = comp {
+                    vsources.push((name.clone(), *n_out_pos, *n_out_neg));
+                } else if let Component::VCVS { name, n_out_pos, n_out_neg, .. } = comp {
                     vsources.push((name.clone(), *n_out_pos, *n_out_neg));
                 }
             }
@@ -64,15 +66,21 @@ impl MnaSystem {
                     if *n_out_neg > 0 && *n_ctrl_pos > 0 { y_matrix[*n_out_neg - 1][*n_ctrl_pos - 1] -= gm; }
                     if *n_out_neg > 0 && *n_ctrl_neg > 0 { y_matrix[*n_out_neg - 1][*n_ctrl_neg - 1] += gm; }
                 }
-                Component::VCVS { n_out_pos, n_out_neg, n_ctrl_pos, n_ctrl_neg, gain, .. } => {
-                    let vs_idx = vsources.iter().position(|(n, _, _)| n == &format!("VCVS_{}", gain)).unwrap_or(0);
+                Component::VCVS { name, n_out_pos, n_out_neg, n_ctrl_pos, n_ctrl_neg, gain, .. } => {
+                    let vs_idx = vsources.iter().position(|(n, _, _)| n == name).unwrap_or(0);
                     let m_idx = num_nodes + vs_idx;
                     let a = Cx::new(*gain, 0.0);
                     
+                    // VCVS constraint: V_out_pos - V_out_neg - gain*V_ctrl_pos + gain*V_ctrl_neg = 0
+                    if *n_out_pos > 0 { y_matrix[m_idx][*n_out_pos - 1] += Cx::new(1.0, 0.0); }
+                    if *n_out_neg > 0 { y_matrix[m_idx][*n_out_neg - 1] -= Cx::new(1.0, 0.0); }
+                    if *n_ctrl_pos > 0 { y_matrix[m_idx][*n_ctrl_pos - 1] -= a; }
+                    if *n_ctrl_neg > 0 { y_matrix[m_idx][*n_ctrl_neg - 1] += a; }
+                    
+                    // Current variable I_E: +1 at out_pos, -1 at out_neg
                     if *n_out_pos > 0 { y_matrix[*n_out_pos - 1][m_idx] += Cx::new(1.0, 0.0); }
                     if *n_out_neg > 0 { y_matrix[*n_out_neg - 1][m_idx] -= Cx::new(1.0, 0.0); }
-                    if *n_ctrl_pos > 0 { y_matrix[m_idx][*n_ctrl_pos - 1] += a; }
-                    if *n_ctrl_neg > 0 { y_matrix[m_idx][*n_ctrl_neg - 1] -= a; }
+                    
                     i_vector[m_idx] = Cx::new(0.0, 0.0);
                 }
                 Component::CCCS { n_out_pos, n_out_neg, ctrl_vsrc_name, gain, .. } => {
