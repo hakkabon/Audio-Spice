@@ -1,6 +1,5 @@
-[package]
-name = "Audio-Spice"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
+[workspace]
+members = [
+    "crates/core",
+]
+resolver = "2"
