@@ -1,10 +1,11 @@
 use crate::{Component, Netlist};
+use crate::error::{SimError, SimResult};
 use crate::models::{DiodeModel, BjtModel, MosfetModel, ModelLibrary};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-pub fn parse_spice_netlist(content: &str) -> Result<(Netlist, ModelLibrary), String> {
+pub fn parse_spice_netlist(content: &str) -> SimResult<(Netlist, ModelLibrary)> {
     let mut netlist = Netlist::new();
     let mut models = ModelLibrary::new();
     let mut subckt_stack = Vec::new();
@@ -32,7 +33,7 @@ pub fn parse_spice_netlist(content: &str) -> Result<(Netlist, ModelLibrary), Str
         match keyword.as_str() {
             ".MODEL" => {
                 if tokens.len() < 3 {
-                    return Err(format!("Line {}: Invalid .MODEL syntax", line_num + 1));
+                    return Err(SimError::ParseError { line: line_num + 1, msg: "Invalid .MODEL syntax".into() });
                 }
                 let model_name = tokens[1].to_string();
                 let model_type = tokens[2].to_uppercase();
@@ -48,24 +49,21 @@ pub fn parse_spice_netlist(content: &str) -> Result<(Netlist, ModelLibrary), Str
                 
                 match model_type.as_str() {
                     "D" => {
-                        let mut model = DiodeModel::default();
-                        model.name = model_name.clone();
+                        let mut model = DiodeModel { name: model_name.clone(), ..Default::default() };
                         apply_diode_params(&mut model, &params);
                         models.add_diode(model);
                     }
                     "NPN" | "PNP" => {
-                        let mut model = BjtModel::default();
-                        model.name = model_name.clone();
+                        let mut model = BjtModel { name: model_name.clone(), ..Default::default() };
                         apply_bjt_params(&mut model, &params);
                         models.add_bjt(model);
                     }
                     "NMOS" | "PMOS" => {
-                        let mut model = MosfetModel::default();
-                        model.name = model_name.clone();
+                        let mut model = MosfetModel { name: model_name.clone(), ..Default::default() };
                         apply_mosfet_params(&mut model, &params);
                         models.add_mosfet(model);
                     }
-                    _ => return Err(format!("Line {}: Unknown model type {}", line_num + 1, model_type)),
+                    _ => return Err(SimError::ParseError { line: line_num + 1, msg: format!("Unknown model type {}", model_type) }),
                 }
             }
             ".SUBCKT" => {
@@ -236,8 +234,8 @@ pub fn parse_spice_netlist(content: &str) -> Result<(Netlist, ModelLibrary), Str
                             netlist.add_component(Component::BJT { name, n_collector, n_base, n_emitter, model, area });
                         }
                     }
-                    'M' => {
-                        if tokens.len() >= 6 {
+                    'M'
+                        if tokens.len() >= 6 => {
                             let name = tokens[0].to_string();
                             let n_drain = tokens[1].parse().unwrap_or(0);
                             let n_gate = tokens[2].parse().unwrap_or(0);
@@ -248,7 +246,6 @@ pub fn parse_spice_netlist(content: &str) -> Result<(Netlist, ModelLibrary), Str
                             let l = if tokens.len() > 7 { tokens[7].parse().unwrap_or(1e-6) } else { 1e-6 };
                             netlist.add_component(Component::MOSFET { name, n_drain, n_gate, n_source, n_body, model, w, l });
                         }
-                    }
                     _ => {}
                 }
             }
@@ -310,21 +307,12 @@ fn parse_value(s: &str) -> Result<f64, String> {
         } else {
             num_str = num_str[..num_str.len()-1].to_string();
         }
-    } else if upper_str.ends_with("V") {
+    } else if upper_str.ends_with("V") || upper_str.ends_with("A") || upper_str.ends_with("S") {
         mult = 1.0;
         num_str = num_str[..num_str.len()-1].to_string();
-    } else if upper_str.ends_with("A") {
-        mult = 1.0;
-        num_str = num_str[..num_str.len()-1].to_string();
-    } else if upper_str.ends_with("HZ") {
+    } else if upper_str.ends_with("HZ") || upper_str.ends_with("DB") {
         mult = 1.0;
         num_str = num_str[..num_str.len()-2].to_string();
-    } else if upper_str.ends_with("DB") {
-        mult = 1.0;
-        num_str = num_str[..num_str.len()-2].to_string();
-    } else if upper_str.ends_with("S") {
-        mult = 1.0;
-        num_str = num_str[..num_str.len()-1].to_string();
     } else {
         // Handle single-character suffixes
         if upper_str.ends_with("MEG") {
@@ -454,8 +442,8 @@ fn apply_mosfet_params(model: &mut MosfetModel, params: &HashMap<String, f64>) {
     if let Some(v) = params.get("KAPPA") { model.kappa = *v; }
 }
 
-pub fn parse_spice_file(path: &Path) -> Result<(Netlist, ModelLibrary), String> {
+pub fn parse_spice_file(path: &Path) -> SimResult<(Netlist, ModelLibrary)> {
     let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+        .map_err(|e| SimError::ParseError { line: 0, msg: format!("Failed to read file: {}", e) })?;
     parse_spice_netlist(&content)
 }

@@ -28,7 +28,9 @@ impl MnaSystem {
         let mut y_matrix = vec![vec![Cx::new(0.0, 0.0); matrix_size]; matrix_size];
         let mut i_vector = vec![Cx::new(0.0, 0.0); matrix_size];
         
-        for i in 0..num_nodes { y_matrix[i][i] += Cx::new(GMIN, 0.0); }
+        for (i, row) in y_matrix.iter_mut().enumerate().take(num_nodes) {
+            row[i] += Cx::new(GMIN, 0.0);
+        }
 
         for comp in &netlist.components {
             match comp {
@@ -130,7 +132,7 @@ impl MnaSystem {
     }
 }
 
-fn add_admittance(y_matrix: &mut Vec<Vec<Cx>>, n1: usize, n2: usize, y: Cx) {
+fn add_admittance(y_matrix: &mut [Vec<Cx>], n1: usize, n2: usize, y: Cx) {
     if n1 > 0 && n2 > 0 {
         y_matrix[n1 - 1][n1 - 1] += y; y_matrix[n2 - 1][n2 - 1] += y;
         y_matrix[n1 - 1][n2 - 1] -= y; y_matrix[n2 - 1][n1 - 1] -= y;

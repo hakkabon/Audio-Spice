@@ -95,15 +95,7 @@ impl CrossoverNetlistBuilder {
             
             driver_output_nodes.insert(driver_id.clone(), *driver_out);
 
-            self.build_filter_network(
-                &mut netlist,
-                amp_node,
-                *driver_in,
-                *driver_out,
-                filter_spec,
-                freq,
-                &format!("W{}", way_idx + 1),
-            );
+            self.build_filter_network(&mut netlist, amp_node, *driver_in, *driver_out, filter_spec);
 
             if self.config.include_driver_models {
                 driver.add_to_netlist(&mut netlist, *driver_in, *driver_out, freq);
@@ -115,16 +107,7 @@ impl CrossoverNetlistBuilder {
         netlist
     }
 
-    fn build_filter_network(
-        &self,
-        netlist: &mut Netlist,
-        amp_node: usize,
-        driver_in: usize,
-        driver_out: usize,
-        filter_spec: &FilterSpec,
-        _freq: f64,
-        _prefix: &str,
-    ) {
+    fn build_filter_network(&self, netlist: &mut Netlist, amp_node: usize, driver_in: usize, driver_out: usize, filter_spec: &FilterSpec) {
         let mut current_node = amp_node;
 
         for (idx, comp) in filter_spec.components.iter().enumerate() {
@@ -261,15 +244,12 @@ impl CrossoverNetlistBuilder {
         let mut r_series = 0.0;
         let mut r_parallel = 0.0;
         for comp in components {
-            match comp.component_type {
-                ComponentType::Resistor => {
-                    if comp.name.contains("series") || comp.name.contains("Series") {
-                        r_series = comp.value;
-                    } else {
-                        r_parallel = comp.value;
-                    }
+            if comp.component_type == ComponentType::Resistor {
+                if comp.name.contains("series") || comp.name.contains("Series") {
+                    r_series = comp.value;
+                } else {
+                    r_parallel = comp.value;
                 }
-                _ => {}
             }
         }
         if r_series > 0.0 {
@@ -405,7 +385,7 @@ impl CrossoverSimulator {
                 f_stop: freq,
                 points_per_decade: 1,
             };
-            let result = simulate_ac(&netlist, &sweep)?;
+            let result = simulate_ac(&netlist, &sweep).map_err(|e| e.to_string())?;
 
             let amp_node = 2;
             let v_amp_cx = result.node_voltages.get(&amp_node).unwrap()[0];
@@ -444,7 +424,7 @@ impl CrossoverSimulator {
 
             for (comp_name, comp_current) in &result.vsource_currents {
                 let cx = Cx::new(comp_current[0].re, comp_current[0].im);
-                component_currents.entry(comp_name.clone()).or_insert_with(Vec::new).push(cx);
+                component_currents.entry(comp_name.clone()).or_default().push(cx);
             }
         }
 

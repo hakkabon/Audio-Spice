@@ -1,4 +1,4 @@
-use audio_spice_core::{Netlist, DcResult, AcResult, TranResult, ModelLibrary, parse_spice_file, parse_spice_netlist};
+use audio_spice_core::{DcResult, AcResult, TranResult, parse_spice_netlist, SimError, SimResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -141,8 +141,8 @@ impl CircuitSimulator {
         Self { project, config }
     }
 
-    pub fn run(&self) -> Result<CircuitSimulationResult, String> {
-        let (netlist, models) = parse_spice_netlist(&self.project.netlist_text)?;
+    pub fn run(&self) -> SimResult<CircuitSimulationResult> {
+        let (netlist, _models) = parse_spice_netlist(&self.project.netlist_text)?;
         
         let mut dc_result = None;
         let mut ac_result = None;
@@ -174,9 +174,9 @@ impl CircuitSimulator {
         Ok(CircuitSimulationResult { dc: dc_result, ac: ac_result, tran: tran_result })
     }
 
-    pub fn load_from_file(path: &Path) -> Result<Self, String> {
+    pub fn load_from_file(path: &Path) -> SimResult<Self> {
         let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+            .map_err(|e| SimError::ParseError { line: 0, msg: format!("Failed to read file: {}", e) })?;
         
         let project = CircuitProject {
             name: path.file_stem().unwrap_or_default().to_string_lossy().to_string(),
@@ -213,7 +213,7 @@ pub mod spice_export {
                 output.push('\n');
             }
             
-            output.push_str("\n");
+            output.push('\n');
             for (name, model) in &models.diodes {
                 output.push_str(&Self::diode_model_to_spice(name, model));
                 output.push('\n');

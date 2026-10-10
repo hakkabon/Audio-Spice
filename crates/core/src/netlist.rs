@@ -6,6 +6,12 @@ pub struct Netlist {
     pub max_node: usize,
 }
 
+impl Default for Netlist {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Netlist {
     pub fn new() -> Self {
         Self { components: Vec::new(), max_node: 0 }

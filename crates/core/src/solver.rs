@@ -1,6 +1,6 @@
 use crate::types::Cx;
 
-pub fn solve_complex_matrix(a: &mut Vec<Vec<Cx>>, b: &mut Vec<Cx>) -> Option<Vec<Cx>> {
+pub fn solve_complex_matrix(a: &mut [Vec<Cx>], b: &mut [Cx]) -> Option<Vec<Cx>> {
     let n = a.len();
     if n == 0 || b.len() != n {
         return None;
@@ -45,10 +45,10 @@ pub fn solve_complex_matrix(a: &mut Vec<Vec<Cx>>, b: &mut Vec<Cx>) -> Option<Vec
             }
         }
     }
-    Some(b.clone())
+    Some(b.to_vec())
 }
 
-pub fn solve_real_matrix(a: &mut Vec<Vec<f64>>, b: &mut Vec<f64>) -> Option<Vec<f64>> {
+pub fn solve_real_matrix(a: &mut [Vec<f64>], b: &mut [f64]) -> Option<Vec<f64>> {
     let n = a.len();
     if n == 0 || b.len() != n {
         return None;
@@ -93,5 +93,5 @@ pub fn solve_real_matrix(a: &mut Vec<Vec<f64>>, b: &mut Vec<f64>) -> Option<Vec<
             }
         }
     }
-    Some(b.clone())
+    Some(b.to_vec())
 }

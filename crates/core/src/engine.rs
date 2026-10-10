@@ -1,3 +1,4 @@
+use crate::error::{SimError, SimResult};
 use crate::mna::MnaSystem;
 use crate::netlist::Netlist;
 use crate::simulation::{AcResult, AcSweep, DcResult, TranResult, TranSweep};
@@ -5,7 +6,7 @@ use crate::solver::{solve_complex_matrix, solve_real_matrix};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
-pub fn simulate_ac(netlist: &Netlist, sweep: &AcSweep) -> Result<AcResult, String> {
+pub fn simulate_ac(netlist: &Netlist, sweep: &AcSweep) -> SimResult<AcResult> {
     let frequencies = sweep.frequencies();
     let mut result_node_voltages = HashMap::new();
     for i in 1..=netlist.max_node { result_node_voltages.insert(i, Vec::with_capacity(frequencies.len())); }
@@ -17,14 +18,29 @@ pub fn simulate_ac(netlist: &Netlist, sweep: &AcSweep) -> Result<AcResult, Strin
 
     for &f in &frequencies {
         let mut mna = MnaSystem::build(netlist, 2.0 * PI * f);
-        let solution = solve_complex_matrix(&mut mna.y_matrix, &mut mna.i_vector).ok_or_else(|| format!("Singular matrix at {} Hz", f))?;
-        for i in 1..=mna.num_nodes { result_node_voltages.get_mut(&i).unwrap().push(solution[i - 1]); }
-        for (idx, name) in vsources.iter().enumerate() { result_vsource_currents.get_mut(name).unwrap().push(solution[mna.num_nodes + idx]); }
+        let solution = solve_complex_matrix(&mut mna.y_matrix, &mut mna.i_vector)
+            .ok_or(SimError::SingularMatrix { freq: f, cond: 0.0 })?;
+        
+        for i in 1..=mna.num_nodes {
+            if let Some(v) = result_node_voltages.get_mut(&i) {
+                v.push(solution[i - 1]);
+            } else {
+                return Err(SimError::NodeOutOfBounds { node: i, max: netlist.max_node });
+            }
+        }
+        
+        for (idx, name) in vsources.iter().enumerate() {
+            if let Some(v) = result_vsource_currents.get_mut(name) {
+                v.push(solution[mna.num_nodes + idx]);
+            } else {
+                return Err(SimError::ComponentNotFound { name: name.clone() });
+            }
+        }
     }
     Ok(AcResult { frequencies, node_voltages: result_node_voltages, vsource_currents: result_vsource_currents })
 }
 
-pub fn simulate_dc(netlist: &Netlist, max_iter: usize, tol: f64) -> Result<DcResult, String> {
+pub fn simulate_dc(netlist: &Netlist, max_iter: usize, tol: f64) -> SimResult<DcResult> {
     let mut voltages = vec![0.0; netlist.max_node];
     let mut prev_voltages = vec![0.0; netlist.max_node];
     
@@ -44,7 +60,9 @@ pub fn simulate_dc(netlist: &Netlist, max_iter: usize, tol: f64) -> Result<DcRes
         let mut g_matrix = vec![vec![0.0; netlist.max_node]; netlist.max_node];
         let mut i_vector = vec![0.0; netlist.max_node];
         
-        for i in 0..netlist.max_node { g_matrix[i][i] += crate::types::GMIN; }
+        for (i, row) in g_matrix.iter_mut().enumerate().take(netlist.max_node) {
+            row[i] += crate::types::GMIN;
+        }
         
         for comp in &netlist.components {
             match comp {
@@ -83,7 +101,8 @@ pub fn simulate_dc(netlist: &Netlist, max_iter: usize, tol: f64) -> Result<DcRes
             }
         }
         
-        let solution = solve_real_matrix(&mut g_matrix, &mut i_vector).ok_or("Singular matrix in DC")?;
+        let solution = solve_real_matrix(&mut g_matrix, &mut i_vector)
+            .ok_or(SimError::SingularMatrix { freq: 0.0, cond: 0.0 })?;
         voltages = solution;
         
         let max_diff = voltages.iter().zip(prev_voltages.iter())
@@ -110,7 +129,7 @@ pub fn simulate_dc(netlist: &Netlist, max_iter: usize, tol: f64) -> Result<DcRes
     Ok(DcResult { node_voltages, vsource_currents, converged, iterations })
 }
 
-pub fn simulate_tran(netlist: &Netlist, sweep: &TranSweep) -> Result<TranResult, String> {
+pub fn simulate_tran(netlist: &Netlist, sweep: &TranSweep) -> SimResult<TranResult> {
     let time_points = sweep.time_points();
     let mut result_node_voltages = HashMap::new();
     for i in 1..=netlist.max_node { result_node_voltages.insert(i, Vec::with_capacity(time_points.len())); }
@@ -123,11 +142,13 @@ pub fn simulate_tran(netlist: &Netlist, sweep: &TranSweep) -> Result<TranResult,
     let mut prev_voltages = vec![0.0; netlist.max_node];
     let dt = sweep.t_step;
     
-    for &t in &time_points {
+    for &_t in &time_points {
         let mut g_matrix = vec![vec![0.0; netlist.max_node]; netlist.max_node];
         let mut i_vector = vec![0.0; netlist.max_node];
         
-        for i in 0..netlist.max_node { g_matrix[i][i] += crate::types::GMIN; }
+        for (i, row) in g_matrix.iter_mut().enumerate().take(netlist.max_node) {
+            row[i] += crate::types::GMIN;
+        }
         
         for comp in &netlist.components {
             match comp {
@@ -157,21 +178,30 @@ pub fn simulate_tran(netlist: &Netlist, sweep: &TranSweep) -> Result<TranResult,
             }
         }
         
-        let solution = solve_real_matrix(&mut g_matrix, &mut i_vector).ok_or("Singular matrix in transient")?;
+        let solution = solve_real_matrix(&mut g_matrix, &mut i_vector)
+            .ok_or(SimError::SingularMatrix { freq: 0.0, cond: 0.0 })?;
         prev_voltages = solution.clone();
         
         for i in 1..=netlist.max_node {
-            result_node_voltages.get_mut(&i).unwrap().push(solution[i - 1]);
+            if let Some(v) = result_node_voltages.get_mut(&i) {
+                v.push(solution[i - 1]);
+            } else {
+                return Err(SimError::NodeOutOfBounds { node: i, max: netlist.max_node });
+            }
         }
         for name in &vsources {
-            result_vsource_currents.get_mut(name).unwrap().push(0.0);
+            if let Some(v) = result_vsource_currents.get_mut(name) {
+                v.push(0.0);
+            } else {
+                return Err(SimError::ComponentNotFound { name: name.clone() });
+            }
         }
     }
     
     Ok(TranResult { time_points, node_voltages: result_node_voltages, vsource_currents: result_vsource_currents })
 }
 
-fn add_conductance(g_matrix: &mut Vec<Vec<f64>>, n1: usize, n2: usize, g: f64) {
+fn add_conductance(g_matrix: &mut [Vec<f64>], n1: usize, n2: usize, g: f64) {
     if n1 > 0 && n2 > 0 {
         g_matrix[n1 - 1][n1 - 1] += g; g_matrix[n2 - 1][n2 - 1] += g;
         g_matrix[n1 - 1][n2 - 1] -= g; g_matrix[n2 - 1][n1 - 1] -= g;
