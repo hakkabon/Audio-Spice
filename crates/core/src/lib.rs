@@ -14,6 +14,8 @@ mod component_tests;
 #[cfg(test)]
 mod mna_tests;
 #[cfg(test)]
+mod noise_sensitivity_tests;
+#[cfg(test)]
 mod solver_tests;
 #[cfg(test)]
 mod simulation_tests;
@@ -27,5 +29,5 @@ pub use engine::{simulate_ac, simulate_dc, simulate_tran};
 pub use error::{SimError, SimResult};
 pub use models::{DiodeModel, BjtModel, MosfetModel, ModelLibrary};
 pub use netlist::Netlist;
-pub use simulation::{AcResult, AcSweep, DcResult, TranResult, TranSweep};
+pub use simulation::{AcResult, AcSweep, DcResult, TranResult, TranSweep, NoiseSweep, NoiseResult, NoiseType, NoiseModel, SensitivitySweep, SensitivityResult, MonteCarloConfig, DistributionType, MonteCarloResult};
 pub use spice_parser::{parse_spice_netlist, parse_spice_file};
