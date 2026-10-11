@@ -3,5 +3,6 @@ members = [
     "crates/core",
     "crates/crossover",
     "crates/circuit",
+    "crates/ffi",
 ]
 resolver = "2"
