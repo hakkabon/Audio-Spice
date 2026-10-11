@@ -1,42 +1,58 @@
 use crate::error::{SimError, SimResult};
-use crate::mna::MnaSystem;
+use crate::mna::{MnaMatrix, MnaSystem};
 use crate::netlist::Netlist;
 use crate::simulation::{AcResult, AcSweep, DcResult, TranResult, TranSweep};
-use crate::solver::{solve_complex_matrix, solve_real_matrix};
+use crate::solver::solve_real_matrix;
+use crate::types::Cx;
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use rayon::prelude::*;
 
 pub fn simulate_ac(netlist: &Netlist, sweep: &AcSweep) -> SimResult<AcResult> {
     let frequencies = sweep.frequencies();
-    let mut result_node_voltages = HashMap::new();
-    for i in 1..=netlist.max_node { result_node_voltages.insert(i, Vec::with_capacity(frequencies.len())); }
     
-    let mut vsources = Vec::new();
-    for comp in &netlist.components { if let crate::Component::VoltageSource { name, .. } = comp { vsources.push(name.clone()); } }
+    // Build the MNA matrix once (topology is fixed)
+    let mna_matrix = MnaMatrix::build_from_netlist(netlist);
+    
+    // Extract voltage source names
+    let vsources: Vec<String> = mna_matrix.vsources.iter().map(|(n, _, _)| n.clone()).collect();
+    
+    // Parallel AC sweep
+    let results: Result<Vec<(f64, Vec<Cx>, Vec<Cx>)>, SimError> = frequencies
+        .par_iter()
+        .map(|&f| {
+            let omega = 2.0 * PI * f;
+            let mut matrix = mna_matrix.clone();
+            matrix.update_for_frequency(omega);
+            
+            let solution = matrix.solve()
+                .ok_or(SimError::SingularMatrix { freq: f, cond: 0.0 })?;
+            
+            let num_nodes = matrix.num_nodes;
+            let node_voltages = solution[..num_nodes].to_vec();
+            let vsource_currents = solution[num_nodes..].to_vec();
+            
+            Ok((f, node_voltages, vsource_currents))
+        })
+        .collect();
+    
+    let results = results?;
+    
+    // Aggregate results
+    let mut result_node_voltages = HashMap::new();
+    for i in 1..=mna_matrix.num_nodes { result_node_voltages.insert(i, Vec::with_capacity(frequencies.len())); }
     let mut result_vsource_currents = HashMap::new();
     for name in &vsources { result_vsource_currents.insert(name.clone(), Vec::with_capacity(frequencies.len())); }
-
-    for &f in &frequencies {
-        let mut mna = MnaSystem::build(netlist, 2.0 * PI * f);
-        let solution = solve_complex_matrix(&mut mna.y_matrix, &mut mna.i_vector)
-            .ok_or(SimError::SingularMatrix { freq: f, cond: 0.0 })?;
-        
-        for i in 1..=mna.num_nodes {
-            if let Some(v) = result_node_voltages.get_mut(&i) {
-                v.push(solution[i - 1]);
-            } else {
-                return Err(SimError::NodeOutOfBounds { node: i, max: netlist.max_node });
-            }
+    
+    for (f, node_voltages, vsource_currents) in results {
+        for (i, v) in node_voltages.into_iter().enumerate() {
+            result_node_voltages.get_mut(&(i + 1)).unwrap().push(v);
         }
-        
         for (idx, name) in vsources.iter().enumerate() {
-            if let Some(v) = result_vsource_currents.get_mut(name) {
-                v.push(solution[mna.num_nodes + idx]);
-            } else {
-                return Err(SimError::ComponentNotFound { name: name.clone() });
-            }
+            result_vsource_currents.get_mut(name).unwrap().push(vsource_currents[idx]);
         }
     }
+    
     Ok(AcResult { frequencies, node_voltages: result_node_voltages, vsource_currents: result_vsource_currents })
 }
 

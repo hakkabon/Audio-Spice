@@ -34,10 +34,18 @@ mod simulation_tests {
         
         // At DC (10Hz), Vout ≈ Vin
         let vout_dc = result.node_voltages.get(&2).unwrap()[0];
+        eprintln!("DC voltage: {}", vout_dc.norm());
         assert!((vout_dc.norm() - 1.0).abs() < 0.01);
+        
+        // Check a few frequencies
+        for (i, &f) in result.frequencies.iter().enumerate() {
+            let v = result.node_voltages.get(&2).unwrap()[i];
+            eprintln!("f={:.1}Hz, Vout={:.6}", f, v.norm());
+        }
         
         // At high frequency (100kHz), Vout should be attenuated
         let vout_hf = result.node_voltages.get(&2).unwrap().last().unwrap();
+        eprintln!("HF voltage: {}, freq: {}", vout_hf.norm(), result.frequencies.last().unwrap());
         assert!(vout_hf.norm() < 0.1);
     }
 
